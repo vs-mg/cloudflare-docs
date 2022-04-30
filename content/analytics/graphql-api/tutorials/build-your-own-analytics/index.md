@@ -10,7 +10,7 @@ In this example, we are going to see how to use the GraphQL Analytics API to bui
 
 ![Creating a chart with GraphQL showing zone traffic](../static/graphQL-recipe-cacheVisual.gif)
 
-The following code will build a page with all the requirements to fetch from GraphQL and plot the cached and uncached bandwidth for the given zone. You will just need to enter your email address, API token, and your zone ID, and then click the **Fetch analytics** button. To download an example of a `CSS` file, you can click [here](/analytics/static/downloads/main.css).
+The following code will build a page with all the requirements to fetch from GraphQL and plot the cached and uncached bandwidth for the given zone. You will just need to enter your email address, API key, and your zone ID, and then click the **Fetch analytics** button. To download an example of a `CSS` file, you can click [here](/analytics/static/downloads/main.css).
 
 ## Code
 
@@ -33,106 +33,119 @@ Cloudflare's [GraphQL endpoint](https://api.cloudflare.com/client/v4/graphql) do
 </head>
 
 <body>
-    <br />
-
-
     <div>
-        <h3><span>Visualise your traffic from GraphQL!</span></h3>
+        <h3>
+            <span>Visualise your traffic from GraphQL!</span>
+        </h3>
         <br />
         <div>
-            <form><label for="site" class=""><span>Enter your API details:</span></label>
-                    <input placeholder= "Email" id="email"></textarea>
-                    <input placeholder= "API Token" id= "apiKey" ></textarea></form>
+            <form>
+                <label for="site" class=""><span>Enter your API details:</span></label>
+                <input placeholder="Email" id="email" />
+                <input placeholder="API Key" id="apiKey" />
+            </form>
         </div>
         <label for="site" class=""><span>Choose the zone tag you want to fetch for:</span></label>
-        <div><input placeholder= "Zone Tag" id="zoneTag"></textarea></div>
+        <div>
+            <input placeholder="Zone Tag" id="zoneTag" />
+        </div>
         <button id="fetch" type="button" data-testid="add-site-button">
-
             <p><span>Fetch analytics</span></p>
         </button>
     </div>
 
+    <span id="error" style="color: red"></span>
 
-
-    <div style="width:50%;">
-        <div id = "error"></div>
-        <canvas id="canvas" style="width:100%;"></canvas>
-    </div>
-    <div style="width:50%;">
-        <div id = "error"></div>
-        <canvas id="canvas2" style="width:100%;"></canvas>
-    </div>
+    <canvas id="canvas" style="width:100%;"></canvas>
     <br />
     <br />
 
     <script>
-        var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
         function chartInit(date, total, cached){
             var config = {
-            type: 'line',
-            data: {
-                labels: date,
-                datasets: [{
-                    label: 'total traffic',
-                    backgroundColor: window.chartColors.red,
-                    borderColor: window.chartColors.red,
-                    data: total,
-                    fill: false,
-                }, {
-                    label: 'Cached traffic',
-                    fill: false,
-                    backgroundColor: window.chartColors.blue,
-                    borderColor: window.chartColors.blue,
-                    data: cached
-                }]
-            },
-            options: {
-                responsive: true,
-                title: {
-                    display: true,
-                    text: 'Cached vs Uncached traffic'
-                },
-                tooltips: {
-                    mode: 'index',
-                    intersect: false,
-                },
-                hover: {
-                    mode: 'nearest',
-                    intersect: true
-                },
-                scales: {
-                    xAxes: [{
-                        display: true,
-                        scaleLabel: {
-                            display: true,
-                            labelString: 'Month'
-                        }
-                    }],
-                    yAxes: [{
-                        display: true,
-                        scaleLabel: {
-                            display: true,
-                            labelString: 'Value'
-                        }
+                type: 'line',
+                data: {
+                    labels: date,
+                    datasets: [{
+                        label: 'Total traffic',
+                        backgroundColor: 'red',
+                        borderColor: 'red',
+                        data: total,
+                        fill: false,
+                    }, {
+                        label: 'Cached traffic',
+                        backgroundColor: 'blue',
+                        borderColor: 'blue',
+                        fill: false,
+                        data: cached
                     }]
+                },
+                options: {
+                    responsive: true,
+                    title: {
+                        display: true,
+                        text: 'Cached vs Uncached traffic'
+                    },
+                    tooltips: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    hover: {
+                        mode: 'nearest',
+                        intersect: true
+                    },
+                    scales: {
+                        xAxes: [{
+                            display: true,
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'Date'
+                            }
+                        }],
+                        yAxes: [{
+                            display: true,
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'Bytes'
+                            }
+                        }]
+                    }
                 }
-            }
-        };
-        return config
+            };
+            return config;
         }
 
-        window.onload = function() {
-
-        };
-
         function fetchAPI(url, email, apiKey, zoneTag) {
+            const today = new Date();
+            const thirtyDaysAgo = new Date(new Date().setDate(today.getDate() - 30));
+            const date = thirtyDaysAgo.toISOString().split('T')[0];
+
             let request = new Request(url)
-            let query = {"query":"{\n  viewer {\n    zones(filter: { zoneTag: " + zoneTag + " }) {\n      httpRequests1dGroups(\n        orderBy: [date_ASC]\n        limit: 1000\n        filter: { date_gt: \"2019-07-15\" }\n      ) {\n        date: dimensions {\n          date\n        }\n        sum {\n          cachedBytes\n          bytes\n        }\n      }\n    }\n  }\n}","variables":{}}
+            const query = `query {
+                viewer {
+                  zones(filter: { zoneTag: $zoneTag }) {
+                    httpRequests1dGroups(
+                      orderBy: [date_ASC]
+                      limit: 1000
+                      filter: { date_gt: $date }
+                    ) {
+                      date: dimensions {
+                        date
+                      }
+                      sum {
+                        cachedBytes
+                        bytes
+                      }
+                    }
+                  }
+                }
+              }`;
+
+            const json = { query, variables: { zoneTag, date,  } };
 
             let init = {
                 method: 'POST',
-                body: JSON.stringify(query)
+                body: JSON.stringify(json)
             }
             request.headers.set('x-auth-key', apiKey)
             request.headers.set('x-auth-email', email)
@@ -147,41 +160,41 @@ Cloudflare's [GraphQL endpoint](https://api.cloudflare.com/client/v4/graphql) do
             var ctx = document.getElementById('canvas').getContext('2d');
             var beforeGraph = document.getElementById('canvas')
 
+            if (!zoneTag) {
+                document.getElementById('error').innerText = 'No Zone ID set!';
+                return;
+            }
+            
             if (email && apiKey) {
                 document.getElementById('error').innerHTML = ""
 
-                let response = await fetchAPI('https://api.cloudflare.com/client/v4/graphql', email, apiKey, zoneTag)
+                // Replace the `api.yourdomain.com` with your CORS proxy.
+                // We have an example Worker here you can use: https://developers.cloudflare.com/workers/examples/cors-header-proxy/
+                let response = await fetchAPI('https://api.yourdomain.com/client/v4/graphql', email, apiKey, zoneTag)
                 let json = await response.json()
 
-                if (response.status == 200) {
+                if (response.status === 200) {
                     var date = []
                     var total = []
                     var cached = []
                     var array = json.data.viewer.zones[0].httpRequests1dGroups
 
-                    for (let i =0 ; i < array.length; i++) {
+                    for (let i = 0; i < array.length; i++) {
                         date.push(array[i].date.date)
                         total.push(array[i].sum.bytes)
                         cached.push(array[i].sum.cachedBytes)
                     }
 
                     window.myLine = new Chart(ctx, chartInit(date, total, cached));
-                }
-                else {
-                    document.getElementById('error').innerHTML = 'error: \n'+ json
-                    document.getElementById('error').style.color = "Red"
+                } else {
+                    document.getElementById('error').innerText = 'error: \n'+ json
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                 }
-
-            }
-            else {
-                document.getElementById('error').innerHTML = "Please fill the form with your key and email"
-                document.getElementById('error').style.color = "Red"
+            } else {
+                document.getElementById('error').innerText = "Please fill the form with your key and email"
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         });
-
-        var colorNames = Object.keys(window.chartColors);
     </script>
 </body>
 </html>
